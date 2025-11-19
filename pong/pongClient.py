@@ -13,6 +13,16 @@ import socket
 
 from assets.code.helperCode import *
 
+def recv_exact(conn, num_bytes):
+    """Receive exactly num_bytes from the socket."""
+    data = b''
+    while len(data) < num_bytes:
+        chunk = conn.recv(num_bytes - len(data))
+        if not chunk:
+            raise ConnectionError("Connection closed before receiving all data")
+        data += chunk
+    return data
+
 # This is the main game loop.  For the most part, you will not need to modify this.  The sections
 # where you should add to the code are marked.  Feel free to change any part of this project
 # to suit your needs.
@@ -83,15 +93,12 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
         # Your code here to send an update to the server on your paddle's information,
         # where the ball is and the current score.
         # Feel free to change when the score is updated to suit your needs/requirements
-        '''
-        Not implemented yet
 
         client.send(playerPaddleObj.rect.y.to_bytes(4, 'big'))  # Send paddle Y position to server
         client.send(ball.rect.x.to_bytes(4, 'big'))  # Send ball X position to server
         client.send(ball.rect.y.to_bytes(4, 'big'))  # Send ball Y position to server
         client.send(lScore.to_bytes(4, 'big'))  # Send left player score to server
         client.send(rScore.to_bytes(4, 'big'))  # Send right player score to server
-        '''
         # =========================================================================================
 
         # Update the player paddle and opponent paddle's location on the screen
@@ -152,7 +159,8 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
         pygame.draw.rect(screen, WHITE, topWall)
         pygame.draw.rect(screen, WHITE, bottomWall)
         scoreRect = updateScore(lScore, rScore, screen, WHITE, scoreFont)
-        pygame.display.update([topWall, bottomWall, ball, leftPaddle, rightPaddle, scoreRect, winMessage])
+        #pygame.display.update([topWall, bottomWall, ball, leftPaddle, rightPaddle, scoreRect, winMessage])
+        pygame.display.flip()
         clock.tick(60)
         
         # This number should be synchronized between you and your opponent.  If your number is larger
