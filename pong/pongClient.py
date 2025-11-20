@@ -13,9 +13,9 @@ import socket
 
 from assets.code.helperCode import *
 
-def recv_exact(conn, num_bytes):
+def recv_exact(conn: socket.socket, num_bytes: int) -> bytes:
     """Receive exactly num_bytes from the socket."""
-    data = b''
+    data: bytes = b''
     while len(data) < num_bytes:
         chunk = conn.recv(num_bytes - len(data))
         if not chunk:
@@ -102,13 +102,13 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
         # =========================================================================================
 
         # Update the player paddle and opponent paddle's location on the screen
-        for paddle in [playerPaddleObj, opponentPaddleObj]:
-            if paddle.moving == "down":
-                if paddle.rect.bottomleft[1] < screenHeight-10:
-                    paddle.rect.y += paddle.speed
-            elif paddle.moving == "up":
-                if paddle.rect.topleft[1] > 10:
-                    paddle.rect.y -= paddle.speed
+        #ONLY update player paddle, opponent paddle will be updated by the server info
+        if playerPaddleObj.moving == "down":
+            if playerPaddleObj.rect.bottomleft[1] < screenHeight-10:
+                playerPaddleObj.rect.y += playerPaddleObj.speed
+        elif playerPaddleObj.moving == "up":
+            if playerPaddleObj.rect.topleft[1] > 10:
+                playerPaddleObj.rect.y -= playerPaddleObj.speed
 
         # If the game is over, display the win message
         if lScore > 4 or rScore > 4:
@@ -170,12 +170,24 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
         # =========================================================================================
         # Send your server update here at the end of the game loop to sync your game with your
         # opponent's game
-        '''
-        Not implemented yet
-        
+
         client.send(sync.to_bytes(4, 'big'))  # Send sync number to server
         # get info from server to sync game
-        '''
+        opp_sync: int = int.from_bytes(recv_exact(client, 4), 'big')  # Receive opponent sync status from server
+        opp_paddle_y: int = int.from_bytes(recv_exact(client, 4), 'big')  # Receive opponent paddle Y position from server
+        opponentPaddleObj.rect.y = opp_paddle_y
+    
+        ball_x: int = int.from_bytes(recv_exact(client, 4), 'big')  # Receive ball X position from server
+        ball_y: int = int.from_bytes(recv_exact(client, 4), 'big')  # Receive ball Y position from server
+        left_score: int = int.from_bytes(recv_exact(client, 4), 'big')  # Receive left player score from server
+        right_score: int = int.from_bytes(recv_exact(client, 4), 'big') #Receive right player score from server
+        
+        if opp_sync > sync:
+            ball.rect.x = ball_x
+            ball.rect.y = ball_y
+            lScore = left_score
+            rScore = right_score
+        
         # =========================================================================================
 
 
@@ -199,13 +211,15 @@ def joinServer(ip:str, port:str, errorLabel:tk.Label, app:tk.Tk) -> None:
 
     # Get the required information from your server (screen width/height & player paddle, "left or "right)
     client.connect((ip, int(port)))
-    player_num = int.from_bytes(client.recv(1), 'big')
+    #set TCP_NODELAY to reduce latency and prevent packets from getting bunched together
+    client.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    player_num: int = int.from_bytes(client.recv(1), 'big')
     if player_num == 1:
-        paddle = "left"
+        paddle: str = "left"
     elif player_num == 2:
-        paddle = "right"
-    screenWidth = int.from_bytes(client.recv(4), 'big')
-    screenHeight = int.from_bytes(client.recv(4), 'big')
+        paddle: str = "right"
+    screenWidth: int = int.from_bytes(client.recv(4), 'big')
+    screenHeight: int = int.from_bytes(client.recv(4), 'big')
     print('player number:', player_num)
     print('screen width:', screenWidth)
     print('screen height:', screenHeight)
