@@ -17,20 +17,21 @@ import threading
 # clients are and take actions to resync the games
 
 HOST = "0.0.0.0"
-PORT = 65432
+PORT = 12345
 
 #Global game state variables
-screen_width = 960
-screen_height = 720
-left_paddle_y = screen_height // 2
-right_paddle_y = screen_height // 2
-ball_x = screen_width // 2
-ball_y = screen_height // 2
-score_left = 0
-score_right = 0
-game_lock = threading.Lock()  # Lock to synchronize access to game state variables
+screen_width: int = 960
+screen_height: int = 720
+left_paddle_y: int = screen_height // 2
+right_paddle_y: int = screen_height // 2
+ball_x: int = screen_width // 2
+ball_y: int = screen_height // 2
+score_left: int = 0
+score_right: int = 0
+game_lock: threading.Lock = threading.Lock()  # Lock to synchronize access to game state variables
+last_sync: list[int] = [0,0]  # List to keep track of sync status for each player
 
-def recv_exact(conn, num_bytes):
+def recv_exact(conn: socket.socket, num_bytes: int) -> bytes:
     """Receive exactly num_bytes from the socket."""
     data = b''
     while len(data) < num_bytes:
@@ -40,9 +41,11 @@ def recv_exact(conn, num_bytes):
         data += chunk
     return data
 
-def handle_client(conn, addr, num):
-    global screen_width, screen_height, left_paddle_y, right_paddle_y, ball_x, ball_y, score_left, score_right
+def handle_client(conn: socket.socket, addr: tuple[str, int], num: int) -> None:
+    global screen_width, screen_height, left_paddle_y, right_paddle_y, ball_x, ball_y, score_left, score_right, last_sync
     print(f"[NEW CONNECTION] {addr}")
+    #set TCP_NODELAY to reduce latency and prevent packets from getting bunched together
+    conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     conn.send(num.to_bytes(1, 'big'))  # Send player number to client
     conn.send(screen_width.to_bytes(4, 'big'))  # Send screen width to client
     conn.send(screen_height.to_bytes(4, 'big'))  # Send screen height to client
@@ -68,13 +71,29 @@ def handle_client(conn, addr, num):
                 ball_y = ball_y_recv
                 score_left = l_score
                 score_right = r_score
-            print(f"Player {num} - Paddle Y: {paddle_y}, Ball X: {ball_x}, Ball Y: {ball_y}, Score Left: {score_left}, Score Right: {score_right}")
+            #print(f"Player {num} - Paddle Y: {paddle_y}, Ball X: {ball_x}, Ball Y: {ball_y}, Score Left: {score_left}, Score Right: {score_right}")
+            sync: int = int.from_bytes(recv_exact(conn, 4), 'big')  # Receive sync status from client
+            if sync > last_sync[num-1]:
+                last_sync[num-1] = sync
+            if num == 1:
+                conn.send(last_sync[1].to_bytes(4, 'big')) # Send opponent sync status to client
+                conn.send(right_paddle_y.to_bytes(4, 'big'))  # Send opponent paddle Y position to client
+            elif num == 2:
+                conn.send(last_sync[0].to_bytes(4, 'big')) # Send opponent sync status to client
+                conn.send(left_paddle_y.to_bytes(4, 'big'))  # Send opponent paddle Y position to client
+
+            #flag: bool = bool(int.from_bytes(recv_exact(conn, 1), 'big'))  # Receive flag from client
+            #if flag:
+            conn.send(ball_x.to_bytes(4, 'big'))  # Send ball X position to client
+            conn.send(ball_y.to_bytes(4, 'big'))  # Send ball Y position to client
+            conn.send(score_left.to_bytes(4, 'big'))  # Send left player score to client
+            conn.send(score_right.to_bytes(4, 'big'))  # Send right player score to client
         except:
             break
     conn.close()
     print(f"[DISCONNECTED] {addr}")
 
-server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_socket: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.bind((HOST, PORT))
 server_socket.listen()
 
@@ -83,4 +102,4 @@ num = 0
 while True:
     conn, addr = server_socket.accept()
     num += 1
-    threading.Thread(target=handle_client, args=(conn, addr, num)).start()
+    threading.Thread(target=handle_client, args=(conn, addr, num), daemon=True).start()
