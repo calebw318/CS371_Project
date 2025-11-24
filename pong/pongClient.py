@@ -1,9 +1,9 @@
 # =================================================================================================
-# Contributing Authors:	    <Anyone who touched the code>
-# Email Addresses:          <Your uky.edu email addresses>
-# Date:                     <The date the file was last edited>
-# Purpose:                  <How this file contributes to the project>
-# Misc:                     <Not Required.  Anything else you might want to include>
+# Contributing Authors:	    Caleb West, Colton Courrejolles, Edwin Saldivar
+# Email Addresses:          cgwe225@uky.edu, ckco240@uky.edu, esa301#uky.edu
+# Date:                     November 24th, 2025
+# Purpose:                  Includes pong game logic and logic for coordinating game state with
+#                           the server, as well as setting up a connection with the server.
 # =================================================================================================
 
 import pygame
@@ -13,6 +13,10 @@ import socket
 
 from assets.code.helperCode import *
 
+#Author: Caleb West
+#Purpose: receive *exactly* num_bytes bytes from the server, no more and no less
+#Pre: the program needs to be receiving data in order for this to be called.
+#Post: returns the data received and is able to receive the next variable to update.
 def recv_exact(conn: socket.socket, num_bytes: int) -> bytes:
     """Receive exactly num_bytes from the socket."""
     data: bytes = b''
